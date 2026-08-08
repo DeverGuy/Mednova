@@ -17,8 +17,13 @@ export default function Navbar() {
   // Poll or check current user login status
   useEffect(() => {
     const checkUser = async () => {
-      const user = await db.getCurrentUser();
-      setCurrentUser(user);
+      const userV2 = await db.getCurrentUserV2();
+      if (userV2) {
+        setCurrentUser({ ...userV2, full_name: userV2.name || userV2.id });
+      } else {
+        const user = await db.getCurrentUser();
+        setCurrentUser(user);
+      }
     };
     checkUser();
     

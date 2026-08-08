@@ -98,9 +98,18 @@ const MOCK_REFERRALS = [];
 
 // V2 Mock Data for Local Storage Fallback
 const MOCK_USERS_DIR = [
-  { id: 'ADMIN-1', password: 'password', role: 'admin', created_at: new Date().toISOString() },
-  { id: 'DOC-1', password: 'password', role: 'doctor', created_at: new Date().toISOString() },
-  { id: 'PAT-1', password: 'password', role: 'patient', created_at: new Date().toISOString() }
+  { id: 'ADMIN-1', name: 'System Admin', password: 'password', role: 'admin', created_at: new Date().toISOString() },
+  { id: 'DOC-1', name: 'Dr. Girish Kumar', password: 'password', role: 'doctor', status: 'approved', created_at: new Date().toISOString() },
+  { id: 'PAT-1', name: 'Ramesh Gowda', password: 'password', role: 'patient', doctor_id: 'DOC-1', created_at: new Date().toISOString() },
+  { id: 'ORG-1', name: 'Shimoga District Hospital', password: 'password', role: 'organization', status: 'approved', created_at: new Date().toISOString() }
+];
+
+const MOCK_ORGANIZATIONS_V2 = [
+  { id: 'ORG-1', name: 'Shimoga District Hospital', address: 'Shimoga', phone: '9999999999', created_at: new Date().toISOString() }
+];
+
+const MOCK_DOCTORS_V2 = [
+  { id: 'DOC-1', name: 'Dr. Girish Kumar', phone: '8888888888', organization_id: 'ORG-1', created_at: new Date().toISOString() }
 ];
 
 const MOCK_PATIENTS_V2 = [
@@ -112,8 +121,7 @@ const MOCK_PATIENTS_V2 = [
     dob: '1979-01-01',
     height: '170cm',
     weight: '70kg',
-    symptoms: 'Mild fever, dry cough',
-    description: 'Patient reports feeling weak for the past 2 days.',
+    doctor_id: 'DOC-1',
     created_at: new Date().toISOString()
   }
 ];
@@ -307,6 +315,9 @@ export const db = {
     const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
     const user = users.find(u => u.id === id && u.password === password && u.role === role);
     if (user) {
+      if (user.status === 'pending') {
+        throw new Error('PENDING_APPROVAL');
+      }
       if (typeof window !== 'undefined') {
         localStorage.setItem('mednova_current_user_v2', JSON.stringify(user));
       }
@@ -319,15 +330,20 @@ export const db = {
     const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
     
     // Generate ID
-    const prefix = role === 'patient' ? 'PAT-' : role === 'doctor' ? 'DOC-' : 'ADM-';
+    const prefix = role === 'patient' ? 'PAT-' : role === 'doctor' ? 'DOC-' : role === 'organization' ? 'ORG-' : 'ADM-';
     const uniqueId = prefix + Math.floor(1000 + Math.random() * 9000);
     
     const newUser = {
       id: uniqueId,
+      name: userData.name,
       password: userData.password,
       role: role,
       created_at: new Date().toISOString()
     };
+
+    if (role === 'doctor' || role === 'organization') {
+      newUser.status = 'pending';
+    }
     
     users.push(newUser);
     setStorageItem('mednova_users', users);
@@ -343,11 +359,30 @@ export const db = {
         dob: userData.dob,
         height: userData.height,
         weight: userData.weight,
-        symptoms: userData.symptoms,
-        description: userData.description,
+        doctor_id: userData.doctor_id || null,
         created_at: new Date().toISOString()
       });
       setStorageItem('mednova_patients_v2', patients);
+    } else if (role === 'doctor') {
+      const doctors = getStorageItem('mednova_doctors_v2', MOCK_DOCTORS_V2);
+      doctors.push({
+        id: uniqueId,
+        name: userData.name,
+        phone: userData.phone,
+        organization_id: userData.organization_id || null,
+        created_at: new Date().toISOString()
+      });
+      setStorageItem('mednova_doctors_v2', doctors);
+    } else if (role === 'organization') {
+      const orgs = getStorageItem('mednova_organizations_v2', MOCK_ORGANIZATIONS_V2);
+      orgs.push({
+        id: uniqueId,
+        name: userData.name,
+        address: userData.address,
+        phone: userData.phone,
+        created_at: new Date().toISOString()
+      });
+      setStorageItem('mednova_organizations_v2', orgs);
     }
     
     return newUser;
@@ -390,5 +425,29 @@ export const db = {
     vitals.push(newVital);
     setStorageItem('mednova_patient_vitals', vitals);
     return newVital;
+  },
+
+  async getAllDoctorsV2() {
+    return getStorageItem('mednova_doctors_v2', MOCK_DOCTORS_V2);
+  },
+
+  async getAllOrganizationsV2() {
+    return getStorageItem('mednova_organizations_v2', MOCK_ORGANIZATIONS_V2);
+  },
+
+  async getPendingApprovals() {
+    const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
+    return users.filter(u => u.status === 'pending');
+  },
+
+  async approveUserV2(id) {
+    const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
+    const index = users.findIndex(u => u.id === id);
+    if (index >= 0) {
+      users[index].status = 'approved';
+      setStorageItem('mednova_users', users);
+      return users[index];
+    }
+    return null;
   }
 };

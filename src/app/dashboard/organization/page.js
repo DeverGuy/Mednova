@@ -1,0 +1,109 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { db } from '@/lib/db';
+import { LogOut, Building2, Stethoscope, Users } from 'lucide-react';
+
+export default function OrganizationDashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [organization, setOrganization] = useState(null);
+  const [doctors, setDoctors] = useState([]);
+
+  useEffect(() => {
+    async function loadData() {
+      const currentUser = await db.getCurrentUserV2();
+      if (!currentUser || currentUser.role !== 'organization') {
+        router.push('/login');
+        return;
+      }
+      setUser(currentUser);
+      
+      const orgs = await db.getAllOrganizationsV2();
+      const myOrg = orgs.find(o => o.id === currentUser.id);
+      setOrganization(myOrg);
+      
+      const allDoctors = await db.getAllDoctorsV2();
+      setDoctors(allDoctors.filter(d => d.organization_id === currentUser.id));
+    }
+    loadData();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await db.logoutV2();
+    router.push('/login');
+  };
+
+  if (!user || !organization) return <div className="p-8 text-center text-teal-600 font-bold">Loading Dashboard...</div>;
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+              <Building2 className="h-6 w-6 text-teal-600" /> Hospital / Organization Dashboard
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">{organization.name} ({organization.id})</p>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center">
+            <Stethoscope className="h-8 w-8 text-teal-500 mb-2" />
+            <h3 className="text-3xl font-black text-slate-800">{doctors.length}</h3>
+            <p className="text-sm text-slate-500">Associated Doctors</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-start">
+            <h3 className="font-bold text-slate-700 mb-4">Organization Profile</h3>
+            <p className="text-sm text-slate-600"><strong>Address:</strong> {organization.address}</p>
+            <p className="text-sm text-slate-600"><strong>Phone:</strong> {organization.phone}</p>
+            <p className="text-sm text-slate-600"><strong>Registered On:</strong> {new Date(organization.created_at).toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        {/* Associated Doctors Section */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-bold text-slate-700 border-b border-slate-100 pb-4 mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-indigo-600" /> Our Doctors
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="text-slate-500 border-b border-slate-200">
+                  <th className="pb-3 font-semibold">Doctor ID</th>
+                  <th className="pb-3 font-semibold">Name</th>
+                  <th className="pb-3 font-semibold">Phone</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doctors.map(d => (
+                  <tr key={d.id} className="border-b border-slate-50">
+                    <td className="py-3 font-medium text-slate-700">{d.id}</td>
+                    <td className="py-3">{d.name}</td>
+                    <td className="py-3 text-slate-500">{d.phone}</td>
+                  </tr>
+                ))}
+                {doctors.length === 0 && (
+                  <tr>
+                    <td colSpan="3" className="py-4 text-center text-slate-400">No doctors associated yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
-import { User, UserPlus, Stethoscope, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
+import { User, UserPlus, Stethoscope, ShieldCheck, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,8 +31,10 @@ export default function LoginPage() {
     dob: '',
     height: '',
     weight: '',
-    symptoms: '',
-    description: ''
+    phone: '',
+    address: '',
+    doctor_id: '',
+    organization_id: ''
   });
 
   const handleLogin = async (e) => {
@@ -52,7 +54,11 @@ export default function LoginPage() {
         setErrorMsg('Invalid ID, password, or role.');
       }
     } catch (err) {
-      setErrorMsg('Login failed. Please try again.');
+      if (err.message === 'PENDING_APPROVAL') {
+        setErrorMsg('Your account is pending Admin approval. We will contact you soon.');
+      } else {
+        setErrorMsg('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -64,8 +70,8 @@ export default function LoginPage() {
     setErrorMsg('');
     
     try {
-      if (role === 'doctor') {
-        // Simulate sending for manual verification
+      if (role === 'doctor' || role === 'organization') {
+        await db.registerV2(regData, role);
         setRegistrationPending(true);
       } else {
         const newUser = await db.registerV2(regData, role);
@@ -92,22 +98,28 @@ export default function LoginPage() {
         </div>
 
         {/* Role Tabs */}
-        <div className="flex border-b border-slate-200">
+        <div className="flex border-b border-slate-200 overflow-x-auto">
           <button
             onClick={() => { setRole('patient'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${role === 'patient' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-3 px-2 text-[13px] font-bold flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 transition-colors ${role === 'patient' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
             <User className="h-4 w-4" /> Patient
           </button>
           <button
             onClick={() => { setRole('doctor'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${role === 'doctor' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-3 px-2 text-[13px] font-bold flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 transition-colors ${role === 'doctor' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
             <Stethoscope className="h-4 w-4" /> Doctor
           </button>
           <button
+            onClick={() => { setRole('organization'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
+            className={`flex-1 py-3 px-2 text-[13px] font-bold flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 transition-colors ${role === 'organization' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <Building2 className="h-4 w-4" /> Hospital
+          </button>
+          <button
             onClick={() => { setRole('admin'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${role === 'admin' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-3 px-2 text-[13px] font-bold flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 transition-colors ${role === 'admin' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
             <ShieldCheck className="h-4 w-4" /> Admin
           </button>
@@ -171,7 +183,7 @@ export default function LoginPage() {
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   className="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-slate-800 focus:bg-white"
-                  placeholder={role === 'patient' ? 'PAT-XXXX' : role === 'doctor' ? 'DOC-XXXX' : 'ADM-XXXX'}
+                  placeholder={role === 'patient' ? 'PAT-XXXX' : role === 'doctor' ? 'DOC-XXXX' : role === 'organization' ? 'ORG-XXXX' : 'ADM-XXXX'}
                 />
               </div>
               <div>
@@ -251,20 +263,48 @@ export default function LoginPage() {
                     <input type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.weight} onChange={e => setRegData({...regData, weight: e.target.value})} />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Associated Doctor ID (Optional)</label>
+                  <input type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="DOC-XXXX" value={regData.doctor_id} onChange={e => setRegData({...regData, doctor_id: e.target.value})} />
+                </div>
               </>
             ) : role === 'doctor' ? (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">Registering as Healthcare Worker (Doctor). Verification is required.</p>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase">Full Name (as per ID)</label>
-                  <input required type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input required type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.name} onChange={e => setRegData({...regData, name: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase">Phone Number</label>
-                  <input required type="tel" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="+91" />
+                  <input required type="tel" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="+91" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Associated Hospital ID (Optional)</label>
+                  <input type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="ORG-XXXX" value={regData.organization_id} onChange={e => setRegData({...regData, organization_id: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase">Upload MBBS / Medical Certificate (PDF/JPG)</label>
+                  <input required type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" />
+                </div>
+              </div>
+            ) : role === 'organization' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">Registering as Hospital/Organization. Verification is required.</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Organization / Hospital Name</label>
+                  <input required type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.name} onChange={e => setRegData({...regData, name: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Phone Number</label>
+                  <input required type="tel" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="+91" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Address / Location</label>
+                  <textarea required className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" rows="2" value={regData.address} onChange={e => setRegData({...regData, address: e.target.value})}></textarea>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Upload Registration Certificate (PDF/JPG)</label>
                   <input required type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" />
                 </div>
               </div>
