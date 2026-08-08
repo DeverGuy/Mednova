@@ -21,8 +21,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} ${notoKannada.variable} h-full`}>
-      <body className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+    <html lang="en" className={`${inter.variable} ${notoKannada.variable} h-full`} suppressHydrationWarning>
+      <body className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans" suppressHydrationWarning>
         <LanguageProvider>
           <Navbar />
           <main className="flex-1 flex flex-col">

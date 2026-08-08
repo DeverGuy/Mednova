@@ -1,312 +1,293 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLanguage } from '@/context/LanguageContext';
 import { db } from '@/lib/db';
-import { Camera, UserCheck, KeyRound, AlertCircle, Scan, Sparkles } from 'lucide-react';
+import { User, UserPlus, Stethoscope, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { t } = useLanguage();
-  const [authMode, setAuthMode] = useState('credentials'); // 'credentials' | 'biometric'
   
-  // Credentials login states
-  const [username, setUsername] = useState('');
+  // 'patient' | 'doctor' | 'admin'
+  const [role, setRole] = useState('patient');
+  
+  // 'login' | 'register'
+  const [mode, setMode] = useState('login');
+
+  // Form states
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registeredId, setRegisteredId] = useState(null);
+  const [registrationPending, setRegistrationPending] = useState(false);
 
-  // Biometric login states
-  const [cameraStream, setCameraStream] = useState(null);
-  const [biometricState, setBiometricState] = useState('idle'); // 'idle' | 'initializing' | 'scanning' | 'success' | 'failed'
-  const [biometricError, setBiometricError] = useState('');
-  const videoRef = useRef(null);
+  // Registration states (Patient specific + generic)
+  const [regData, setRegData] = useState({
+    password: '',
+    name: '',
+    age: '',
+    gender: 'Male',
+    dob: '',
+    height: '',
+    weight: '',
+    symptoms: '',
+    description: ''
+  });
 
-  // Stop camera stream when component unmounts or mode changes
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [authMode]);
-
-  const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
-    }
-  };
-
-  const startCamera = async () => {
-    setBiometricState('initializing');
-    setBiometricError('');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 }
-      });
-      setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setBiometricState('scanning');
-      
-      // Simulate face detection scanning phase
-      setTimeout(async () => {
-        // Automatically succeed for the demo/authentication
-        setBiometricState('success');
-        setTimeout(async () => {
-          // Log in default ASHA worker profile
-          await db.login('Sharda', '1234');
-          stopCamera();
-          router.push('/dashboard');
-        }, 1500);
-      }, 3000);
-
-    } catch (err) {
-      console.error('Camera initialization failed:', err);
-      setBiometricState('failed');
-      setBiometricError('Camera access denied or unavailable. Please use credentials or simulated scanner.');
-    }
-  };
-
-  const handleCredentialsSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
-      setErrorMsg('Please enter both username and password.');
+    if (!loginId || !password) {
+      setErrorMsg('Please enter both ID and password.');
       return;
     }
     setLoading(true);
     setErrorMsg('');
+    
     try {
-      const profile = await db.login(username, password);
-      if (profile) {
-        router.push('/dashboard');
+      const user = await db.loginV2(loginId, password, role);
+      if (user) {
+        router.push(`/dashboard/${role}`);
       } else {
-        setErrorMsg('Invalid credentials.');
+        setErrorMsg('Invalid ID, password, or role.');
       }
     } catch (err) {
-      setErrorMsg('Authentication error. Try again.');
+      setErrorMsg('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const simulateBiometricSuccess = async () => {
-    setBiometricState('scanning');
-    setTimeout(async () => {
-      setBiometricState('success');
-      setTimeout(async () => {
-        await db.login('Sharda', '1234');
-        router.push('/dashboard');
-      }, 1500);
-    }, 2000);
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+    
+    try {
+      if (role === 'doctor') {
+        // Simulate sending for manual verification
+        setRegistrationPending(true);
+      } else {
+        const newUser = await db.registerV2(regData, role);
+        setRegisteredId(newUser.id);
+      }
+    } catch (err) {
+      setErrorMsg('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center items-center py-10 px-4 sm:px-6 lg:px-8 bg-slate-50 relative overflow-hidden">
-      
-      {/* Decorative medical pulses in background */}
-      <div className="absolute top-10 left-10 text-teal-100 opacity-20 pointer-events-none">
-        <svg width="400" height="150" viewBox="0 0 400 150">
-          <path d="M 0,75 L 100,75 L 115,30 L 130,120 L 145,60 L 155,90 L 165,75 L 400,75" fill="none" stroke="currentColor" strokeWidth="4" />
-        </svg>
-      </div>
-
-      <div className="w-full max-w-lg space-y-6 z-10">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 glass-panel p-8 rounded-2xl shadow-sm">
         
-        {/* Portal Header */}
         <div className="text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-600 mb-2 border border-teal-200 shadow-sm">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">
-            {t('login_title')}
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 font-medium">
-            {t('login_sub')}
+          <h2 className="text-3xl font-extrabold text-slate-800">
+            Mednova Portal
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Sign in to access your dashboard
           </p>
         </div>
 
-        {/* Form Container */}
-        <div className="glass-panel rounded-2xl p-6 sm:p-8">
-          
-          {/* Tabs header */}
-          <div className="flex border-b border-slate-200 mb-6">
+        {/* Role Tabs */}
+        <div className="flex border-b border-slate-200">
+          <button
+            onClick={() => { setRole('patient'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
+            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${role === 'patient' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <User className="h-4 w-4" /> Patient
+          </button>
+          <button
+            onClick={() => { setRole('doctor'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
+            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${role === 'doctor' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <Stethoscope className="h-4 w-4" /> Doctor
+          </button>
+          <button
+            onClick={() => { setRole('admin'); setMode('login'); setRegisteredId(null); setRegistrationPending(false); }}
+            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${role === 'admin' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            <ShieldCheck className="h-4 w-4" /> Admin
+          </button>
+        </div>
+
+        {errorMsg && (
+          <div className="flex items-center gap-2 bg-red-50 text-red-800 text-sm p-3 rounded-lg border border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            {errorMsg}
+          </div>
+        )}
+
+        {registrationPending ? (
+          <div className="text-center space-y-4 py-6">
+            <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200">
+              <p className="font-bold text-lg mb-2">Application Under Review</p>
+              <p className="text-sm">
+                Your medical credentials have been submitted securely.
+              </p>
+              <p className="text-sm mt-2">
+                Our verification team will review your MBBS certificate and call you shortly to complete the onboarding process.
+              </p>
+            </div>
             <button
-              onClick={() => { setAuthMode('credentials'); stopCamera(); }}
-              className={`flex-1 pb-3 text-sm font-semibold border-b-2 text-center transition-colors cursor-pointer ${
-                authMode === 'credentials'
-                  ? 'border-teal-600 text-teal-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+              onClick={() => {
+                setMode('login');
+                setRegistrationPending(false);
+              }}
+              className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-colors"
             >
-              <span className="flex items-center justify-center gap-2">
-                <KeyRound className="h-4 w-4" />
-                {t('login_credentials_btn')}
-              </span>
-            </button>
-            <button
-              onClick={() => { setAuthMode('biometric'); startCamera(); }}
-              className={`flex-1 pb-3 text-sm font-semibold border-b-2 text-center transition-colors cursor-pointer ${
-                authMode === 'biometric'
-                  ? 'border-teal-600 text-teal-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <Camera className="h-4 w-4" />
-                {t('login_biometric_btn')}
-              </span>
+              Return to Login
             </button>
           </div>
-
-          {/* Error notifications */}
-          {errorMsg && (
-            <div className="mb-4 flex items-start gap-2 bg-red-50 text-red-800 text-xs font-semibold p-3 rounded-lg border border-red-200">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
+        ) : registeredId ? (
+          <div className="text-center space-y-4 py-6">
+            <div className="bg-teal-50 text-teal-800 p-4 rounded-xl border border-teal-200">
+              <p className="font-bold text-lg mb-2">Registration Successful!</p>
+              <p className="text-sm mb-1">Your unique Login ID is:</p>
+              <p className="text-3xl font-black text-teal-600 tracking-wider">{registeredId}</p>
+              <p className="text-xs mt-3 text-teal-700">Please save this ID safely, you will need it to log in.</p>
             </div>
-          )}
-
-          {/* Credentials Mode */}
-          {authMode === 'credentials' && (
-            <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+            <button
+              onClick={() => {
+                setLoginId(registeredId);
+                setMode('login');
+                setRegisteredId(null);
+              }}
+              className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-colors"
+            >
+              Proceed to Login
+            </button>
+          </div>
+        ) : mode === 'login' ? (
+          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  {t('login_username')}
-                </label>
+                <label className="block text-xs font-bold text-slate-700 uppercase">Your Unique ID</label>
                 <input
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. Sharda Gowda"
-                  className="w-full bg-slate-50/50 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white"
+                  required
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-slate-800 focus:bg-white"
+                  placeholder={role === 'patient' ? 'PAT-XXXX' : role === 'doctor' ? 'DOC-XXXX' : 'ADM-XXXX'}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  {t('login_password')}
-                </label>
+                <label className="block text-xs font-bold text-slate-700 uppercase">Password</label>
                 <input
                   type="password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••"
-                  className="w-full bg-slate-50/50 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white"
+                  className="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-slate-800 focus:bg-white"
+                  placeholder="••••••••"
                 />
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all transform active:scale-95 cursor-pointer min-h-[48px]"
-              >
-                {loading ? t('loading') : (
-                  <>
-                    <UserCheck className="h-5 w-5" />
-                    {t('login_btn_sign_in')}
-                  </>
-                )}
-              </button>
-
-              <div className="mt-4 pt-4 border-t border-slate-100 text-center">
-                <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full">
-                  {t('login_mock_credentials')}
-                </span>
-              </div>
-            </form>
-          )}
-
-          {/* Biometric/Camera Scanner Mode */}
-          {authMode === 'biometric' && (
-            <div className="space-y-4">
-              
-              {/* Webcam preview container */}
-              <div className="relative w-full aspect-video bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-200 flex items-center justify-center">
-                
-                {cameraStream ? (
-                  <video
-                    ref={videoRef}
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover scale-x-[-1]"
-                  />
-                ) : (
-                  <div className="text-center p-4 text-slate-400">
-                    <Scan className="h-12 w-12 mx-auto mb-2 text-slate-500 stroke-[1.5]" />
-                    <p className="text-xs font-medium text-slate-400">Camera Feed Offline</p>
-                  </div>
-                )}
-
-                {/* Oval Face Guide HUD overlay */}
-                {biometricState !== 'idle' && biometricState !== 'failed' && (
-                  <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                    {/* The Green Guide Oval */}
-                    <div className={`w-[170px] h-[220px] rounded-[50%] border-2 border-dashed transition-colors duration-500 ${
-                      biometricState === 'success' ? 'border-emerald-500 bg-emerald-500/10' : 'border-teal-400'
-                    }`} />
-                    
-                    {/* Running Scan animation line */}
-                    {biometricState === 'scanning' && (
-                      <div className="absolute left-0 right-0 h-0.5 bg-teal-400/80 shadow-[0_0_12px_#2dd4bf] animate-[bounce_2.5s_infinite]" />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Status message */}
-              <div className="text-center py-2">
-                {biometricState === 'initializing' && (
-                  <p className="text-xs font-semibold text-amber-600 animate-pulse">Initializing webcam...</p>
-                )}
-                {biometricState === 'scanning' && (
-                  <p className="text-xs font-bold text-teal-600 animate-pulse flex items-center justify-center gap-1.5">
-                    <Scan className="h-4 w-4 text-teal-500 animate-spin" />
-                    {t('login_face_scanning')}
-                  </p>
-                )}
-                {biometricState === 'success' && (
-                  <p className="text-xs font-bold text-emerald-600 bg-emerald-50 py-1.5 px-3 rounded-full inline-block border border-emerald-100">
-                    {t('login_face_success')}
-                  </p>
-                )}
-                {biometricState === 'failed' && (
-                  <div className="text-center space-y-2">
-                    <p className="text-xs font-semibold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">
-                      {biometricError || t('login_face_failed')}
-                    </p>
-                    <button
-                      onClick={startCamera}
-                      className="text-xs font-semibold text-teal-600 hover:text-teal-700 underline cursor-pointer"
-                    >
-                      Retry Camera Hookup
-                    </button>
-                  </div>
-                )}
-                {biometricState === 'idle' && (
-                  <p className="text-xs text-slate-500">{t('login_face_guide')}</p>
-                )}
-              </div>
-
-              {/* Simulation tools for testing environments */}
-              <div className="pt-3 border-t border-slate-100 text-center flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={simulateBiometricSuccess}
-                  disabled={biometricState === 'success' || biometricState === 'scanning'}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer min-h-[40px]"
-                >
-                  <Sparkles className="h-4 w-4 text-teal-400" />
-                  Simulate Face Biometric Matching
-                </button>
-              </div>
-
             </div>
-          )}
 
-        </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition-all"
+            >
+              {loading ? 'Logging in...' : (
+                <>Sign In <ArrowRight className="h-4 w-4" /></>
+              )}
+            </button>
+
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => setMode('register')}
+                className="text-sm text-teal-600 hover:text-teal-800 font-semibold flex items-center justify-center gap-1 mx-auto"
+              >
+                <UserPlus className="h-4 w-4" /> Need an account? Register
+              </button>
+            </div>
+            
+            <div className="text-center mt-4">
+              <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full">
+                Mock Login: Use PAT-1 (Patient), DOC-1 (Doctor), ADMIN-1 (Admin) with password "password"
+              </span>
+            </div>
+          </form>
+        ) : (
+          <form className="mt-8 space-y-4" onSubmit={handleRegister}>
+            {role === 'patient' ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Full Name</label>
+                    <input required type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.name} onChange={e => setRegData({...regData, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Age</label>
+                    <input required type="number" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.age} onChange={e => setRegData({...regData, age: e.target.value})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Gender</label>
+                    <select className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.gender} onChange={e => setRegData({...regData, gender: e.target.value})}>
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Date of Birth</label>
+                    <input type="date" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.dob} onChange={e => setRegData({...regData, dob: e.target.value})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Height (e.g. 170cm)</label>
+                    <input type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.height} onChange={e => setRegData({...regData, height: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase">Weight (e.g. 70kg)</label>
+                    <input type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.weight} onChange={e => setRegData({...regData, weight: e.target.value})} />
+                  </div>
+                </div>
+              </>
+            ) : role === 'doctor' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">Registering as Healthcare Worker (Doctor). Verification is required.</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Full Name (as per ID)</label>
+                  <input required type="text" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Phone Number</label>
+                  <input required type="tel" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" placeholder="+91" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase">Upload MBBS / Medical Certificate (PDF/JPG)</label>
+                  <input required type="file" accept=".pdf,.jpg,.jpeg,.png" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-slate-600 mb-4">Registering as Administrator.</p>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase">Set Password</label>
+              <input required type="password" placeholder="Min 6 characters" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} />
+            </div>
+
+            <button type="submit" disabled={loading} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl">
+              {loading ? 'Processing...' : 'Complete Registration'}
+            </button>
+
+            <button type="button" onClick={() => setMode('login')} className="w-full mt-2 text-sm text-slate-500 hover:text-slate-700 py-2">
+              Cancel
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
