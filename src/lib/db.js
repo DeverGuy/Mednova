@@ -302,6 +302,15 @@ export const db = {
   // --- V2 Auth (New Implementation) ---
   // ==========================================
   async loginV2(id, password, role) {
+    if (supabase) {
+      const { data, error } = await supabase.from('users').select('*').eq('id', id).eq('password', password).eq('role', role).single();
+      if (data) {
+        if (typeof window !== 'undefined') localStorage.setItem('mednova_current_user_v2', JSON.stringify(data));
+        return data;
+      }
+      return null;
+    }
+
     const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
     const user = users.find(u => u.id === id && u.password === password && u.role === role);
     if (user) {
@@ -314,23 +323,41 @@ export const db = {
   },
 
   async registerV2(userData, role) {
-    const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
-    
-    // Generate ID
-    const prefix = role === 'patient' ? 'PAT-' : role === 'doctor' ? 'DOC-' : 'ADM-';
+    const prefix = role === 'patient' ? 'PAT-' : role === 'doctor' ? 'DOC-' : role === 'organization' ? 'ORG-' : 'ADM-';
     const uniqueId = prefix + Math.floor(1000 + Math.random() * 9000);
-    
+
     const newUser = {
       id: uniqueId,
       password: userData.password,
       role: role,
-      created_at: new Date().toISOString()
+      status: role === 'patient' ? 'approved' : 'pending' // Only patients are auto-approved, others need admin
     };
-    
+
+    if (supabase) {
+      await supabase.from('users').insert([newUser]);
+      if (role === 'patient') {
+        const patientData = {
+          id: uniqueId,
+          name: userData.name,
+          age: parseInt(userData.age) || 0,
+          gender: userData.gender,
+          dob: userData.dob,
+          height: userData.height,
+          weight: userData.weight,
+          symptoms: userData.symptoms,
+          description: userData.description
+        };
+        await supabase.from('patients').insert([patientData]);
+      }
+      return newUser;
+    }
+
+    // Mock fallback
+    const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
+    newUser.created_at = new Date().toISOString();
     users.push(newUser);
     setStorageItem('mednova_users', users);
 
-    // If patient, also create patient record
     if (role === 'patient') {
       const patients = getStorageItem('mednova_patients_v2', MOCK_PATIENTS_V2);
       patients.push({
@@ -365,20 +392,36 @@ export const db = {
 
   // --- V2 Data Access ---
   async getPatientV2(id) {
+    if (supabase) {
+      const { data, error } = await supabase.from('patients').select('*').eq('id', id).single();
+      return data || null;
+    }
     const patients = getStorageItem('mednova_patients_v2', MOCK_PATIENTS_V2);
     return patients.find(p => p.id === id) || null;
   },
 
   async getAllPatientsV2() {
+    if (supabase) {
+      const { data, error } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
+      return data || [];
+    }
     return getStorageItem('mednova_patients_v2', MOCK_PATIENTS_V2);
   },
 
   async getPatientVitals(patientId) {
+    if (supabase) {
+      const { data, error } = await supabase.from('patient_vitals').select('*').eq('patient_id', patientId).order('created_at', { ascending: false });
+      return data || [];
+    }
     const vitals = getStorageItem('mednova_patient_vitals', MOCK_PATIENT_VITALS);
     return vitals.filter(v => v.patient_id === patientId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   },
 
   async addPatientVitals(vitalData) {
+    if (supabase) {
+      const { data, error } = await supabase.from('patient_vitals').insert([vitalData]).select().single();
+      return data;
+    }
     const vitals = getStorageItem('mednova_patient_vitals', MOCK_PATIENT_VITALS);
     const newVital = {
       id: `vit-${Math.random().toString(36).substr(2, 9)}`,
