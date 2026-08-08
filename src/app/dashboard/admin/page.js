@@ -77,7 +77,7 @@ export default function AdminDashboard() {
                       <td className="py-3 font-medium text-slate-700">{p.id}</td>
                       <td className="py-3">{p.name}</td>
                       <td className="py-3">{p.age} / {p.gender}</td>
-                      <td className="py-3 text-slate-500">{new Date(p.created_at).toLocaleDateString()}</td>
+                      <td suppressHydrationWarning className="py-3 text-slate-500">{new Date(p.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
                 </tbody>

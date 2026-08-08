@@ -108,7 +108,7 @@ export default function PatientDashboard() {
                   <div className="flex items-center gap-3">
                     <div className="bg-teal-100 text-teal-700 p-2 rounded-lg"><Calendar className="h-5 w-5"/></div>
                     <div>
-                      <p className="text-xs text-slate-500 font-semibold">{new Date(v.created_at).toLocaleString()}</p>
+                      <p suppressHydrationWarning className="text-xs text-slate-500 font-semibold">{new Date(v.created_at).toLocaleString()}</p>
                       <p className="text-xs text-slate-400">Added by: {v.added_by_doctor_id}</p>
                     </div>
                   </div>

@@ -187,7 +187,7 @@ export default function PatientDetailsPage() {
                     <div className="flex items-center gap-3">
                       <div className="bg-white border border-slate-200 text-slate-600 p-2 rounded-lg shadow-sm"><Calendar className="h-5 w-5"/></div>
                       <div>
-                        <p className="text-xs text-slate-700 font-bold">{new Date(v.created_at).toLocaleString()}</p>
+                        <p suppressHydrationWarning className="text-xs text-slate-700 font-bold">{new Date(v.created_at).toLocaleString()}</p>
                         <p className="text-[10px] text-slate-500 uppercase font-bold">Added by: {v.added_by_doctor_id}</p>
                       </div>
                     </div>

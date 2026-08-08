@@ -278,7 +278,7 @@ export default function DashboardPage() {
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-slate-500 font-medium">
+                      <td suppressHydrationWarning className="px-6 py-4 text-slate-500 font-medium">
                         {new Date(patient.created_at).toLocaleDateString(language === 'kn' ? 'kn-IN' : 'en-IN', {
                           day: 'numeric', month: 'short', year: 'numeric'
                         })}

@@ -312,7 +312,7 @@ export default function ChatbotPage() {
                   : 'bg-teal-600 text-white rounded-tr-none font-semibold shadow-sm'
               }`}>
                 <p>{msg.text}</p>
-                <span className={`block text-[9px] mt-1.5 text-right ${isBot ? 'text-slate-400' : 'text-teal-200'}`}>
+                <span suppressHydrationWarning className={`block text-[9px] mt-1.5 text-right ${isBot ? 'text-slate-400' : 'text-teal-200'}`}>
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
