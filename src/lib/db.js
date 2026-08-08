@@ -90,56 +90,43 @@ const MOCK_PATIENTS = [
     abha_id: '42-1298-3482-19',
     created_by_asha_id: '11111111-1111-1111-1111-111111111111',
     created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
-  },
+  }
+];
+
+const MOCK_TRIAGE = [];
+const MOCK_REFERRALS = [];
+
+// V2 Mock Data for Local Storage Fallback
+const MOCK_USERS_DIR = [
+  { id: 'ADMIN-1', password: 'password', role: 'admin', created_at: new Date().toISOString() },
+  { id: 'DOC-1', password: 'password', role: 'doctor', created_at: new Date().toISOString() },
+  { id: 'PAT-1', password: 'password', role: 'patient', created_at: new Date().toISOString() }
+];
+
+const MOCK_PATIENTS_V2 = [
   {
-    id: 'p3333333-3333-3333-3333-333333333333',
-    name: 'Anand Kumar',
-    age: 62,
+    id: 'PAT-1',
+    name: 'Ramesh Gowda',
+    age: 45,
     gender: 'Male',
-    abha_id: '12-9843-2284-95',
-    created_by_asha_id: '11111111-1111-1111-1111-111111111111',
+    dob: '1979-01-01',
+    height: '170cm',
+    weight: '70kg',
+    symptoms: 'Mild fever, dry cough',
+    description: 'Patient reports feeling weak for the past 2 days.',
     created_at: new Date().toISOString()
   }
 ];
 
-const MOCK_TRIAGE = [
+const MOCK_PATIENT_VITALS = [
   {
-    id: 't1111111-1111-1111-1111-111111111111',
-    patient_id: 'p1111111-1111-1111-1111-111111111111',
-    symptoms: { fever: true, cough: true, breathlessness: false, chest_pain: false, fever_duration: '3 days' },
-    risk_level: 'LOW',
-    vitals: { temp: 99.2, spo2: 98, bp_systolic: 120, bp_diastolic: 80, hr: 78 },
-    language_used: 'kn',
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-  },
-  {
-    id: 't2222222-2222-2222-2222-222222222222',
-    patient_id: 'p2222222-2222-2222-2222-222222222222',
-    symptoms: { fever: true, cough: false, breathlessness: true, chest_pain: false, fever_duration: '5 days' },
-    risk_level: 'MODERATE',
-    vitals: { temp: 101.5, spo2: 93, bp_systolic: 110, bp_diastolic: 72, hr: 95 },
-    language_used: 'en',
-    created_at: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: 't3333333-3333-3333-3333-333333333333',
-    patient_id: 'p3333333-3333-3333-3333-333333333333',
-    symptoms: { fever: true, cough: true, breathlessness: true, chest_pain: true, fever_duration: '1 day' },
-    risk_level: 'EMERGENCY',
-    vitals: { temp: 102.1, spo2: 88, bp_systolic: 85, bp_diastolic: 55, hr: 115 },
-    language_used: 'kn',
-    created_at: new Date().toISOString()
-  }
-];
-
-const MOCK_REFERRALS = [
-  {
-    id: 'r1111111-1111-1111-1111-111111111111',
-    triage_id: 't3333333-3333-3333-3333-333333333333',
-    source_phc: 'Kanakapura Rural PHC',
-    target_hospital_id: 'a8be65cf-e2c7-45bc-8dfb-10d65b77e8a1',
-    qr_code_hash: 'MEDNOVA-REF-ANAND-KUMAR-EMERGENCY',
-    status: 'PENDING',
+    id: 'vit-1',
+    patient_id: 'PAT-1',
+    heart_rate: 78,
+    blood_pressure: '120/80',
+    temperature: 99.2,
+    oxygen_saturation: 98,
+    added_by_doctor_id: 'DOC-1',
     created_at: new Date().toISOString()
   }
 ];
@@ -165,32 +152,17 @@ const setStorageItem = (key, data) => {
 export const db = {
   isOffline: !isSupabaseConfigured,
 
-  // --- Auth & Profiles ---
+  // --- Auth & Profiles (Original) ---
   async getProfiles() {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('profiles').select('*');
-      if (error) throw error;
-      return data;
-    }
     return getStorageItem('mednova_profiles', MOCK_PROFILES);
   },
 
   async getProfile(id) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
-      if (error) throw error;
-      return data;
-    }
     const profiles = getStorageItem('mednova_profiles', MOCK_PROFILES);
     return profiles.find(p => p.id === id) || profiles[0]; // fallback to default ASHA
   },
 
   async upsertProfile(profile) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('profiles').upsert(profile).select();
-      if (error) throw error;
-      return data[0];
-    }
     const profiles = getStorageItem('mednova_profiles', MOCK_PROFILES);
     const index = profiles.findIndex(p => p.id === profile.id);
     const updatedProfile = { ...profile, created_at: profile.created_at || new Date().toISOString() };
@@ -203,32 +175,17 @@ export const db = {
     return updatedProfile;
   },
 
-  // --- Patients ---
+  // --- Patients (Original) ---
   async getPatients() {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
     return getStorageItem('mednova_patients', MOCK_PATIENTS).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   },
 
   async getPatient(id) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('patients').select('*').eq('id', id).single();
-      if (error) throw error;
-      return data;
-    }
     const patients = getStorageItem('mednova_patients', MOCK_PATIENTS);
     return patients.find(p => p.id === id) || null;
   },
 
   async createPatient(patient) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('patients').insert(patient).select();
-      if (error) throw error;
-      return data[0];
-    }
     const patients = getStorageItem('mednova_patients', MOCK_PATIENTS);
     const newPatient = {
       ...patient,
@@ -240,32 +197,17 @@ export const db = {
     return newPatient;
   },
 
-  // --- Triage Records ---
+  // --- Triage Records (Original) ---
   async getTriageRecords() {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('triage_records').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
     return getStorageItem('mednova_triage', MOCK_TRIAGE).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   },
 
   async getTriageRecord(id) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('triage_records').select('*').eq('id', id).single();
-      if (error) throw error;
-      return data;
-    }
     const triage = getStorageItem('mednova_triage', MOCK_TRIAGE);
     return triage.find(t => t.id === id) || null;
   },
 
   async createTriageRecord(record) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('triage_records').insert(record).select();
-      if (error) throw error;
-      return data[0];
-    }
     const triage = getStorageItem('mednova_triage', MOCK_TRIAGE);
     const newRecord = {
       ...record,
@@ -277,32 +219,17 @@ export const db = {
     return newRecord;
   },
 
-  // --- Hospitals ---
+  // --- Hospitals (Original) ---
   async getHospitals() {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('hospitals').select('*');
-      if (error) throw error;
-      return data;
-    }
     return getStorageItem('mednova_hospitals', MOCK_HOSPITALS);
   },
 
   async getHospital(id) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('hospitals').select('*').eq('id', id).single();
-      if (error) throw error;
-      return data;
-    }
     const hospitals = getStorageItem('mednova_hospitals', MOCK_HOSPITALS);
     return hospitals.find(h => h.id === id) || null;
   },
 
   async updateHospitalBeds(id, bedsAvailable) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('hospitals').update({ icu_beds_available: bedsAvailable }).eq('id', id).select();
-      if (error) throw error;
-      return data[0];
-    }
     const hospitals = getStorageItem('mednova_hospitals', MOCK_HOSPITALS);
     const index = hospitals.findIndex(h => h.id === id);
     if (index >= 0) {
@@ -313,32 +240,17 @@ export const db = {
     return null;
   },
 
-  // --- Referrals ---
+  // --- Referrals (Original) ---
   async getReferrals() {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('referrals').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
     return getStorageItem('mednova_referrals', MOCK_REFERRALS).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   },
 
   async getReferral(id) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('referrals').select('*').eq('id', id).single();
-      if (error) throw error;
-      return data;
-    }
     const referrals = getStorageItem('mednova_referrals', MOCK_REFERRALS);
     return referrals.find(r => r.id === id) || null;
   },
 
   async createReferral(referral) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('referrals').insert(referral).select();
-      if (error) throw error;
-      return data[0];
-    }
     const referrals = getStorageItem('mednova_referrals', MOCK_REFERRALS);
     const newReferral = {
       ...referral,
@@ -351,11 +263,6 @@ export const db = {
   },
 
   async updateReferralStatus(id, status) {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('referrals').update({ status }).eq('id', id).select();
-      if (error) throw error;
-      return data[0];
-    }
     const referrals = getStorageItem('mednova_referrals', MOCK_REFERRALS);
     const index = referrals.findIndex(r => r.id === id);
     if (index >= 0) {
@@ -366,10 +273,8 @@ export const db = {
     return null;
   },
 
-  // --- Auth Session Simulator (Local Mode) ---
+  // --- Auth Session Simulator (Local Mode - Original) ---
   async login(username, password) {
-    // For local mode, we allow simple mock auth.
-    // If username matches an existing profile full_name (e.g. "Sharda" or "Girish") or roles.
     const profiles = getStorageItem('mednova_profiles', MOCK_PROFILES);
     const profile = profiles.find(p => p.full_name.toLowerCase().includes(username.toLowerCase())) || profiles[0];
     if (typeof window !== 'undefined') {
@@ -382,7 +287,6 @@ export const db = {
     if (typeof window === 'undefined') return null;
     const userStr = localStorage.getItem('mednova_current_user');
     if (!userStr) {
-      // Seed with Sharda Gowda as the default logged in worker
       const defaultAsha = getStorageItem('mednova_profiles', MOCK_PROFILES)[0];
       localStorage.setItem('mednova_current_user', JSON.stringify(defaultAsha));
       return defaultAsha;
@@ -394,5 +298,97 @@ export const db = {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('mednova_current_user');
     }
+  },
+
+  // ==========================================
+  // --- V2 Auth (New Implementation) ---
+  // ==========================================
+  async loginV2(id, password, role) {
+    const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
+    const user = users.find(u => u.id === id && u.password === password && u.role === role);
+    if (user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('mednova_current_user_v2', JSON.stringify(user));
+      }
+      return user;
+    }
+    return null;
+  },
+
+  async registerV2(userData, role) {
+    const users = getStorageItem('mednova_users', MOCK_USERS_DIR);
+    
+    // Generate ID
+    const prefix = role === 'patient' ? 'PAT-' : role === 'doctor' ? 'DOC-' : 'ADM-';
+    const uniqueId = prefix + Math.floor(1000 + Math.random() * 9000);
+    
+    const newUser = {
+      id: uniqueId,
+      password: userData.password,
+      role: role,
+      created_at: new Date().toISOString()
+    };
+    
+    users.push(newUser);
+    setStorageItem('mednova_users', users);
+
+    // If patient, also create patient record
+    if (role === 'patient') {
+      const patients = getStorageItem('mednova_patients_v2', MOCK_PATIENTS_V2);
+      patients.push({
+        id: uniqueId,
+        name: userData.name,
+        age: userData.age,
+        gender: userData.gender,
+        dob: userData.dob,
+        height: userData.height,
+        weight: userData.weight,
+        symptoms: userData.symptoms,
+        description: userData.description,
+        created_at: new Date().toISOString()
+      });
+      setStorageItem('mednova_patients_v2', patients);
+    }
+    
+    return newUser;
+  },
+
+  async getCurrentUserV2() {
+    if (typeof window === 'undefined') return null;
+    const userStr = localStorage.getItem('mednova_current_user_v2');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  async logoutV2() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('mednova_current_user_v2');
+    }
+  },
+
+  // --- V2 Data Access ---
+  async getPatientV2(id) {
+    const patients = getStorageItem('mednova_patients_v2', MOCK_PATIENTS_V2);
+    return patients.find(p => p.id === id) || null;
+  },
+
+  async getAllPatientsV2() {
+    return getStorageItem('mednova_patients_v2', MOCK_PATIENTS_V2);
+  },
+
+  async getPatientVitals(patientId) {
+    const vitals = getStorageItem('mednova_patient_vitals', MOCK_PATIENT_VITALS);
+    return vitals.filter(v => v.patient_id === patientId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+
+  async addPatientVitals(vitalData) {
+    const vitals = getStorageItem('mednova_patient_vitals', MOCK_PATIENT_VITALS);
+    const newVital = {
+      id: `vit-${Math.random().toString(36).substr(2, 9)}`,
+      ...vitalData,
+      created_at: new Date().toISOString()
+    };
+    vitals.push(newVital);
+    setStorageItem('mednova_patient_vitals', vitals);
+    return newVital;
   }
 };
