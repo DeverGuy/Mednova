@@ -103,6 +103,15 @@ const MOCK_USERS_DIR = [
   { id: 'PAT-1', password: 'password', role: 'patient', created_at: new Date().toISOString() }
 ];
 
+const MOCK_MEDICINES = [
+  { id: 'm1', name: 'Paracetamol 500mg', manufacturer: 'Generic', description: 'For fever' },
+  { id: 'm2', name: 'Amoxicillin 250mg', manufacturer: 'Pfizer', description: 'Antibiotic' }
+];
+
+const MOCK_INVENTORY = [
+  { id: 'inv1', centre_id: 'a8be65cf-e2c7-45bc-8dfb-10d65b77e8a1', medicine_id: 'm1', stock_level: 50, last_updated: new Date().toISOString() }
+];
+
 const MOCK_PATIENTS_V2 = [
   {
     id: 'PAT-1',
@@ -431,5 +440,107 @@ export const db = {
     vitals.push(newVital);
     setStorageItem('mednova_patient_vitals', vitals);
     return newVital;
+  },
+
+  // --- Ecosystem / Inventory Data ---
+  async getMedicines() {
+    if (supabase) {
+      const { data, error } = await supabase.from('medicines').select('*').order('name');
+      return data || [];
+    }
+    return getStorageItem('mednova_medicines', MOCK_MEDICINES);
+  },
+
+  async getCentres() {
+    if (supabase) {
+      const { data, error } = await supabase.from('healthcare_centres').select('*').order('name');
+      return data || [];
+    }
+    return getStorageItem('mednova_hospitals', MOCK_HOSPITALS);
+  },
+
+  async updateInventory(centre_id, medicine_id, stock_level) {
+    if (supabase) {
+      const { data, error } = await supabase.from('centre_inventory')
+        .upsert({ centre_id, medicine_id, stock_level, last_updated: new Date().toISOString() }, { onConflict: 'centre_id, medicine_id' })
+        .select().single();
+      return data;
+    }
+    const inventory = getStorageItem('mednova_inventory', MOCK_INVENTORY);
+    const existingIndex = inventory.findIndex(i => i.centre_id === centre_id && i.medicine_id === medicine_id);
+    if (existingIndex >= 0) {
+      inventory[existingIndex].stock_level = stock_level;
+      inventory[existingIndex].last_updated = new Date().toISOString();
+    } else {
+      inventory.push({ id: `inv-${Date.now()}`, centre_id, medicine_id, stock_level, last_updated: new Date().toISOString() });
+    }
+    setStorageItem('mednova_inventory', inventory);
+    return true;
+  },
+
+  async searchMedicineAvailability(searchTerm) {
+    if (!searchTerm) return [];
+    
+    if (supabase) {
+      // In Supabase, we can search medicines and join the inventory and centres.
+      const { data, error } = await supabase
+        .from('medicines')
+        .select(`
+          id, name, manufacturer,
+          centre_inventory (
+            stock_level,
+            last_updated,
+            healthcare_centres (
+              id, name, type, latitude, longitude, contact_number, district
+            )
+          )
+        `)
+        .ilike('name', `%${searchTerm}%`);
+        
+      if (error || !data) return [];
+      
+      // Flatten the response so the UI has an array of availability records
+      const results = [];
+      data.forEach(med => {
+        if (med.centre_inventory) {
+          med.centre_inventory.forEach(inv => {
+            if (inv.stock_level > 0 && inv.healthcare_centres) {
+              results.push({
+                medicine: { id: med.id, name: med.name, manufacturer: med.manufacturer },
+                stock_level: inv.stock_level,
+                last_updated: inv.last_updated,
+                centre: inv.healthcare_centres
+              });
+            }
+          });
+        }
+      });
+      return results;
+    }
+
+    // Mock fallback
+    const medicines = getStorageItem('mednova_medicines', MOCK_MEDICINES);
+    const inventory = getStorageItem('mednova_inventory', MOCK_INVENTORY);
+    const centres = getStorageItem('mednova_hospitals', MOCK_HOSPITALS);
+    
+    const matchedMeds = medicines.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const results = [];
+    
+    matchedMeds.forEach(med => {
+      const medInventory = inventory.filter(i => i.medicine_id === med.id && i.stock_level > 0);
+      medInventory.forEach(inv => {
+        const centre = centres.find(c => c.id === inv.centre_id);
+        if (centre) {
+          results.push({
+            medicine: med,
+            stock_level: inv.stock_level,
+            last_updated: inv.last_updated,
+            centre: centre
+          });
+        }
+      });
+    });
+    
+    return results;
   }
 };

@@ -9,6 +9,8 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [patients, setPatients] = useState([]);
+  const [centres, setCentres] = useState([]);
+  const [medicines, setMedicines] = useState([]);
 
   useEffect(() => {
     async function loadData() {
@@ -21,6 +23,12 @@ export default function AdminDashboard() {
       
       const pData = await db.getAllPatientsV2();
       setPatients(pData);
+      
+      const cData = await db.getCentres();
+      setCentres(cData);
+      
+      const mData = await db.getMedicines();
+      setMedicines(mData);
     }
     loadData();
   }, [router]);
@@ -84,6 +92,47 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
+        </div>
+
+        {/* Inventory Management Panel */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-bold text-slate-700 border-b border-slate-100 pb-4 mb-4">Inventory Management</h3>
+          <form className="grid grid-cols-1 md:grid-cols-4 gap-4" onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const centreId = form.centre.value;
+            const medicineId = form.medicine.value;
+            const stockLevel = form.stock.value;
+            if (centreId && medicineId && stockLevel) {
+              await db.updateInventory(centreId, medicineId, parseInt(stockLevel));
+              alert('Stock updated successfully!');
+              form.reset();
+            }
+          }}>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Healthcare Centre</label>
+              <select name="centre" required className="w-full border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none focus:border-teal-500">
+                <option value="">Select Centre...</option>
+                {centres.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Medicine</label>
+              <select name="medicine" required className="w-full border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none focus:border-teal-500">
+                <option value="">Select Medicine...</option>
+                {medicines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Stock Level</label>
+              <input type="number" name="stock" required min="0" className="w-full border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none focus:border-teal-500" placeholder="e.g. 50" />
+            </div>
+            <div className="flex items-end">
+              <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 rounded-lg transition-colors">
+                Update Stock
+              </button>
+            </div>
+          </form>
         </div>
 
       </div>
