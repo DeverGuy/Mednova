@@ -287,9 +287,7 @@ export const db = {
     if (typeof window === 'undefined') return null;
     const userStr = localStorage.getItem('mednova_current_user');
     if (!userStr) {
-      const defaultAsha = getStorageItem('mednova_profiles', MOCK_PROFILES)[0];
-      localStorage.setItem('mednova_current_user', JSON.stringify(defaultAsha));
-      return defaultAsha;
+      return null;
     }
     return JSON.parse(userStr);
   },
